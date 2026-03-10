@@ -24,14 +24,14 @@ You give the AI the data from that 1 home sensor, and the AI predicts (or "draws
 
 The AI learns how to do this in **two main phases**.
 
-### 🟢 Phase 1: The "Compression/Summary" Phase
+### 🟢 Phase 1: The "Compression/Summary" Phase (Semantic TimeGAN)
 Imagine giving an AI a giant, messy 500-page book and asking it to write a clean 1-page summary.
 
 In our project, the AI takes the messy, noisy electricity data from the **1 forehead sensor** and compresses it into a clean, tiny "summary" of the brainwave. 
 *   **The Embedder AI:** This creates the tiny summary. It throws away the noise and keeps only the most important pieces of the sleep signal.
 *   **The Recovery AI:** This takes the summary and tries to stretch it back out to its original messy state, just to prove that nothing important was accidentally deleted during the summarization.
 
-### 🔵 Phase 2: The "Artist and Judge" Phase (Generative Training)
+### 🔵 Phase 2: The "Artist and Judge" Phase (AC-TimeGAN Generative Training)
 Now the AI needs to use that clean 1-page summary to "draw" the missing 127 sensors. To do this, we use two AIs that battle each other: the Artist and the Judge.
 
 *   **The Generator AI (The Artist):** The Artist looks at the clean summary from Phase 1. It uses that summary to guess and "paint" the electricity lines for all 128 sensors.
