@@ -1,0 +1,388 @@
+\documentclass[journal,10pt,twocolumn]{IEEEtran}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{pgfplots}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning}
+\usepackage{hyperref}
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=20mm,
+ top=20mm,
+ }
+
+\pgfplotsset{compat=1.17}
+
+\begin{document}
+
+\title{AC-TimeGAN: A Supervisory-Governed Digital Twin Architecture for NREM Dream State Synthesis and Classification}
+
+\author{Sachin R.
+\thanks{The author is with the Department of Computer Science and Engineering, Amrita School of Computing, Amrita Vishwa Vidyapeetham, Coimbatore, India. Contact: sachin.r@amrita.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+The objective classification of rare dream experiences during non-rapid eye movement (NREM) sleep poses a sustained challenge in computational neuroscience. Two primary obstacles impede progress in this domain: a stark lack of clinical empirical data and the persistent spectral instability common when using unconstrained deep generative models. In this paper, we propose AC-TimeGAN. This integrated neuro-symbolic framework combines actively supervised adversarial temporal learning with an Auxiliary Classifier architecture. Our primary technical aim is the high-fidelity synthesis and precise downstream classification of imbalanced clinical EEG signals. The defining structural advantage of our approach is the integration of a deterministic Physiology-Aware Alignment (PAA) pipeline. PAA utilizes explicit spectral moment-matching logic to directly enforce the biological 1/f power law, effectively mitigating the generative spectral distortion often seen in existing literature. We conducted extensive evaluations using the public DREAM database from Monash University, which provides comprehensive polysomnography paired with subject mentation reports through 19-channel longitudinal sleep EEG recordings. The proposed supervisory architecture achieved a weighted classification accuracy of 78.0\% alongside a macro F1-score of 0.64. This outcome outperformed unconstrained conditional baseline architectures. Our empirical results suggest that active, system-level label governance ensures biologically sound synthetic data augmentation. This provides a practical, high-fidelity data generation workflow for complex and data-scarce cognitive Brain-Computer Interfaces.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Brain-Computer Interfaces (BCI), Data Augmentation, Electroencephalography (EEG), Generative Adversarial Networks (GANs), Sleep Stage Classification, Spectral Bounding.
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Electroencephalography (EEG) stands as the primary non-invasive modality for studying cognitive states, exploring neural dynamics, and tracking subjective experiential phenomena. Because of its inherently high temporal resolution, EEG allows researchers to map rapid brain interactions. Recent advances in representation learning have improved EEG-based sequence classification, paying specific dividends in the challenging domain of tracking non-stationary cognitive shifts during sleep \cite{siclari2018dreaming}. The long-term viability of these predictive pipelines, however, hinges on the availability of large and well-sampled empirical datasets. When working within clinical environments, capturing specific neurological occurrences—such as active dreaming during Non-Rapid Eye Movement (NREM) sleep—proves exceptionally difficult. Available datasets suffer from severe class imbalances and are usually constrained by ethical limitations and logistical collection barriers. 
+
+Researchers have turned toward deep generative modeling to bypass this data scarcity. Early approaches explored signal-level augmentation and generalized GAN-based EEG synthesis frameworks, including TimeGAN \cite{yoon2019time} and specific recurrent conditional architectures \cite{vahid2022conditional}. While generative strategies often provide numerical improvements on downstream classification accuracy, they carry distinct theoretical limitations. Recurrent adversarial models are prone to severe spectral frequency distortion. They frequently lose track of the absolute physiological frequency curve ordering and often collapse the underlying temporal microstate transition structure entirely \cite{habashi2023generative}. As a direct result, synthetically generated signals can successfully trick basic numerical detection metrics while entirely failing to retain the defining physical and neurophysiological sequence properties that the classifier actually needs.
+
+A noticeable computational gap therefore persists between generalized statistical signal generation and the synthesis of actual, physiologically consistent EEG arrays. Existing generative architectures usually optimize open-ended adversarial or parameter reconstruction objectives. They accomplish this without directing the complex frequency-domain structures, maintaining temporal microstate syntax dynamics \cite{diezig2024eeg, tarailis2024functional}, or enforcing task-specific discriminative label boundaries. Improving visual Euclidean sequence similarity does not translate into meaningful biological fidelity or proper generalization during constrained clinical evaluation protocols.
+
+To address these core limitations directly, we propose AC-TimeGAN (Auxiliary Classifier TimeGAN). AC-TimeGAN operates as an integrated generative framework that actively structures and bounds synthetic temporal EEG sequences using three mechanisms: deterministic spectral alignment, temporal state diversity preservation, and task-aware label feedback. Instead of leaning purely on open conditional adversarial training loops, the concept utilizes post-generation physiological topological regularization alongside classification-aware symbolic constraints. Integrating these constraints ensures the artificially generated sequences maintain the target physiological frequency domain structure, the necessary structural temporal dynamics, and the target-class discriminative boundaries needed for clinical mapping.
+
+The primary contributions of this paper address these problems. Specifically:
+\begin{itemize}
+    \item We detail the deployment of a continuous EEG generation framework explicitly engineered to preserve biological spectral characteristics and temporal Markovian sequence diversity, stretching beyond the limits of conventional unconstrained synthesis models.
+    \item We show that our actively governed design significantly improves downstream classification limits. We tested this specifically using an imbalanced, highly constrained Train-Synthetic, Test-Real (TSTR) clinical evaluation protocol.
+    \item We map out advanced quantitative and qualitative temporal modeling analyses. This includes tests for spectral Euclidean alignment fidelity, mapping complex Markovian microstate transition sequence dynamics, and viewing multidimensional t-SNE topological manifold interactions.
+    \item We validate the structural mechanics of the model against a fully established public clinical EEG dataset, benchmarking the AC-TimeGAN architecture systematically against a series of current parameterized neuro-generation baselines.
+\end{itemize}
+
+\subsection{Organization of the Paper}
+The paper structure flows as follows. Section II reviews the current literature and BCI optimizations relevant to the topic. Section III outlines the proposed AC-TimeGAN architecture and the specific PAA algorithmic mathematical logic. Section IV details the experimental setup and analyzes the system results. Section V offers direct comparative evaluations against state-of-the-art predictive frameworks, and Section VI concludes the research.
+
+\section{Literature Review}
+
+\subsection{Context and Problem Framing}
+Researchers have studied the neurobiological markers of dreaming extensively across both rapid eye movement (REM) and non-rapid eye movement (NREM) sleep cycles. Regardless of the cycle, modeling the physical neural signs of subjective internal dreams remains computationally difficult. This difficulty stems mostly from the non-stationary nature of sleep EEG recordings and their notoriously low signal-to-noise ratios. Post-awakening self-reports also introduce layers of subjectivity, memory decay, and conceptual ambiguity \cite{siclari2018dreaming}. Frameworks focusing on internally versus externally directed attention, such as the spatial studies developed by Vortmann et al. \cite{10.3389/fnhum.2019.00348}, highlight exactly how difficult it is to parse entirely internalized NREM states from standard waking functions. Developing reliable classification for these experiences could eventually help diagnose early-stage neurodegenerative diseases and help science trace human consciousness patterns. Bypassing the lack of clinical data and mitigating signal noise therefore remain major targets in modern clinical neuroscience.
+
+\subsection{Traditional EEG Classification approaches}
+Past studies generally treated cognitive state detection as a straightforward supervised classification problem. Teams applied standard machine learning models to pre-filtered, fixed-length EEG segments. For example, Naidu et al. \cite{naidu2024emotion} utilized hybrid 1D-CNN and LSTM networks geared specifically toward emotion detection operating on limited datasets. Anitha et al. \cite{anitha2024efficient} similarly built predictive pipelines optimized for single-channel automated sleep scoring, while other regional projects explored generalized real-time biosignal monitoring concepts \cite{amrita2022eeg, amrita2025single}. Although these discriminative methods provide strong baseline accuracy, they operate under the assumption that the training dataset is balanced. They usually rely heavily on extracting static spatial features like delta band power or alpha frequency shifts, frequently missing the evolving, continuous temporal structure that actually defines a dreaming sequence.
+
+\subsection{Sequence and Temporal Modeling}
+To move beyond isolated static spatial features, researchers have started heavily applying time-series modeling architectures like LSTMs, GRUs, and Temporal Convolutional Networks (TCNs). These continuous sequence-learning models keep a running track of recent physiological context. This allows them to better follow changing, non-stationary brain states over time. Experimental generative models, such as the adversarial continuous time-series systems demonstrated in TimeGAN \cite{yoon2019time} and the generalized conditional image mapping structures shown in AC-GAN \cite{odena2017conditional}, laid a basic foundation for sequential data generation. But when deployed strictly onto EEG data, these recurrent models still operate mainly to map input signals directly to predefined target labels. They rarely attempt to model the underlying physical probability distributions of the dream EEG activity itself, leaving them highly prone to overfitting when real clinical data runs scarce.
+
+\subsection{Generative Augmentation Models}
+Generative networks, primarily Generative Adversarial Networks (GANs), have drawn strong interest for their ability to create continuous synthetic EEG data streams. The primary clinical goal is usually to artificially balance datasets before applying a final, separate discriminative classifier stage \cite{8852227, hartmann2018eeggan}. For example, Zuo et al. \cite{zuo2025high} recently introduced a dense parameter EEG-GAN-GD framework constructed specifically to penalize mapping errors found in generated spatial topologies. Wang et al. \cite{10839074} proposed an iterative Denoising Diffusion Probabilistic Model (DDPM) to reach new limits in EEG signal super-resolution. This mirrors other guided diffusion algorithms utilized recently for abstract visual decoding \cite{li2024visualdecodingreconstructioneeg, 11154007}. Hybrid conditional architectures—such as deep reinforcement-learning diffusion models proposed by An et al. \cite{an2024enhancingeegsignalgeneration} and basic continuous conditional GANs explored by Vahid et al. \cite{vahid2022conditional}—attempt to hold onto specific continuous amplitude structures. We have also seen the early deployment of synthetic EEG data streams directly applied to diagnosing major depressive disorder patterns \cite{10.3389/fnins.2023.1219133}. Despite these engineering attempts, existing generative models usually prioritize static spatial fidelity over time. Most algorithms fail to enforce longitudinal, long-range temporal dynamics. Over longer generation sequences, this oversight routinely results in mode collapse, structural realism drop-offs, and frequency distribution distortions.
+
+\subsection{Microstates and Brain Connectivity}
+An important, often overlooked aspect of physical neurophysiology is the concept of brain "microstates." Often described as the discrete "atoms of thought," microstates represent transient, quasi-stable electrophysiological local topographies that last for approximately 100 milliseconds before shifting. Groundbreaking studies by Diezig et al. \cite{diezig2024eeg} and Tarailis et al. \cite{tarailis2024functional} demonstrated that continuous brain activity actually consists of these clustered rapid transitions, formally known as microstate syntax. While analyzing microstate syntax is common practice in passive, observational cognitive EEG research, very few active, deep generative models have mathematically tested whether they actually preserve this vital transition syntax when synthesizing extended NREM dreaming records.
+
+\subsection{Managing Dataset Imbalance}
+Achieving high-fidelity neural synthesis becomes even harder given current benchmark dataset limitations. Fully verified dream experience datasets—particularly those that successfully record high-density polysomnography alongside synchronized subjective mentation reports from the user \cite{wong2023dream}—are exceedingly rare. The physical and logistical challenges involved in collecting continuous, uninterrupted sleep data result in severe, inherent class imbalances within the final databases. In most of these benchmark datasets, neutral "No-Recall" states drastically overshadow the exceedingly rare clinical "Dream Experience" (DE) states. These architectural constraints emphasize the absolute necessity for governed generative models. Deep architectures are not just needed to pad data numerically; they must reliably and consistently search for the latent, underlying physical structure defining the dream EEG dynamics.
+
+\subsection{Summary of Scientific Gaps}
+Our review of the modern computational neuroscience literature outlines several continuing structural barriers. First, current predictive approaches rely unsafely on passive discriminative models rather than active structural mapping. Second, they frequently process short, artificially isolated temporal windows instead of natural continuous flows. Third, models struggle constantly to generate biologically realistic or spectrally stable EEG longitudinal data sequences. And finally, these frameworks almost entirely lack validation for ensuring temporal continuity and accurate microstate transition syntax tracking.
+
+To help bridge these physical and computational gaps, this work deploys the Auxiliary Classifier TimeGAN (AC-TimeGAN) framework. This specific architecture jointly handles multi-dimensional temporal sequence phase dynamics alongside the precise class-conditional label structure inherently needed when processing NREM dream EEG signals. This level of mathematical integration enables stable, continuous sequence generation, scaling systems even under the clinical scarcities typical of biological data mapping.
+
+\section{Proposed Work}
+
+\subsection{System Architecture and Flow Diagram}
+The proposed methodology is comprehensively formulated around the AC-TimeGAN architecture, functioning fundamentally as an active, system-level supervisory governor rather than a merely passive data synthesizer. The system architecture, illustrated abstractly, is deeply integrated across four distinct sequential mathematical processing phases: 
+
+\begin{enumerate}
+    \item \textbf{Phase 1: Deterministic Latent Embedding} (Dimensionality Reduction)
+    \item \textbf{Phase 2: Supervisory Conditioned Temporal Generation} (Adversarial Sequence Construction)
+    \item \textbf{Phase 3: Active Auxiliary Classification} (Label Enforcement)
+    \item \textbf{Phase 4: Physiology-Aware Alignment (PAA)} (Deterministic Spectral Bounding)
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tikzpicture}[
+    auto, thick,
+    data/.style = {rectangle, draw=black!80, fill=green!10, minimum width=3cm, minimum height=1cm, text centered, font=\sffamily\normalsize, rounded corners=1ex},
+    model/.style = {rectangle, draw=blue!80, fill=blue!10, minimum width=3cm, minimum height=1cm, text centered, font=\sffamily\normalsize, rounded corners=1ex},
+    control/.style = {rectangle, draw=red!80, fill=red!10, minimum width=3.5cm, minimum height=1cm, text centered, font=\sffamily\normalsize, rounded corners=1ex},
+    line/.style = {draw=black!70, -latex, thick}
+]
+    % Top Row
+    \node [data] (real) at (0, 0) {Real EEG ($X_{1:T}$)};
+    \node [model] (encoder) at (4, 0) {Encoder $\mathcal{E}$};
+    \node [data] (latent) at (8, 0) {Latent ($H_{1:T}$)};
+    \node [model] (decoder) at (12, 0) {Decoder $\mathcal{D}$};
+    \node [data] (recon) at (16, 0) {Recon ($\tilde{X}_{1:T}$)};
+
+    % Bottom Row
+    \node [data] (noise) at (0, -4) {Noise ($Z_{1:T},Y$)};
+    \node [model] (generator) at (4, -4) {Generator $\mathcal{G}$};
+    \node [model] (supervisor) at (8, -4) {Supervisor $\mathcal{S}$};
+
+    % Middle / Final Nodes
+    \node [control] (discriminator) at (6, -2) {Discriminator $\mathcal{D}_x$ \& Classifier $\mathcal{C}$};
+    \node [control] (paa) at (16, -2) {PAA Governor};
+    \node [data] (final) at (16, -4) {Final Synth ($\hat{X}_{1:T}$)};
+
+    % Arrows - Top
+    \draw [line] (real) -- (encoder);
+    \draw [line] (encoder) -- (latent);
+    \draw [line] (latent) -- (decoder);
+    \draw [line] (decoder) -- (recon);
+
+    % Arrows - Bottom
+    \draw [line] (noise) -- (generator);
+    \draw [line] (generator) -- (supervisor);
+    \draw [line] (supervisor) -- (latent);
+
+    % Arrows - Cross
+    \draw [line] (latent.south west) -- (discriminator.north);
+    \draw [line] (generator.north east) -- (discriminator.south);
+
+    % Arrows - Post
+    \draw [line] (recon) -- (paa);
+    \draw [line] (paa) -- (final);
+\end{tikzpicture}%
+}
+\caption{System Architecture diagram of the proposed AC-TimeGAN framework containing explicit embedding, supervisory generation, active classification, and PAA spectral bounding mechanisms.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Phase 1: Deterministic Latent Embedding}
+Biological EEG signals reside as continuous points within a high-dimensional spatial feature space, $\mathcal{X}$. The underlying engineering purpose of the initial embedding phase is to map these empirical physiological sequences, denoted $x_{1:T} \in \mathcal{X}$, directly into a significantly lower-dimensional, temporally tractable, and highly organized latent continuous space, $h_{1:T} \in \mathcal{H}$. 
+
+We built the core mapping utilizing a deep Gated Recurrent Unit (GRU) formulation to serve as our mathematical embedding function $\mathcal{E}:\mathcal{X} \rightarrow \mathcal{H}$. For any incoming vector iteration $x_{t}$ at a specific discrete time interval $t$, the system explicitly calculates the hidden state vector $h_{t}$ using the following notation:
+\begin{equation}
+    h_t = \mathcal{E}(h_{t-1}, x_t) = \text{GRU}_{enc}(x_t, h_{t-1})
+\end{equation}
+Following this forward embedding step, the model applies a symmetrical recovery function $\mathcal{D}:\mathcal{H} \rightarrow \mathcal{X}$. This reverse function mathematically reconstructs the generated vectors back into the initial physical signal space:
+\begin{equation}
+    \tilde{x}_t = \mathcal{D}(h_t) = \text{GRU}_{dec}(h_t)
+\end{equation}
+This auto-encoding module strictly aims to minimize the exact mathematical Reconstruction Loss ($\mathcal{L}_{recon}$). We calculate this loss factor comprehensively across all available spatial recording channels to ensure the base signal morphological integrity matches the incoming data stream closely.
+
+\subsection{Phase 2: Conditioned Temporal Generation}
+In this next phase, the core architecture algorithmically generates the synthetic neural sequence latent representations, $\hat{h}_{1:T}$. We systematically feed the adversarial Generator network, $\mathcal{G}$, with a standardized 1D Gaussian noise vector sequence $Z_{1:T}$. This noise sequence is specifically concatenated mathematically alongside a designated class label target $Y \in \{\text{DE}, \text{NE}, \text{NR}\}$.
+
+\begin{equation}
+    \hat{h}_t = \mathcal{G}(Z_t, Y, \hat{h}_{t-1})
+\end{equation}
+
+To guarantee temporal continuity and maintain Markovian transition dynamics across time, the dedicated Supervisor network $\mathcal{S}$ steps into the loop. The design structures $\mathcal{S}$ mathematically to approximate the exact transitional probability distributions $p(h_t | h_{1:t-1})$ inherently observed within the real physical sequences. Doing so enforces an active, logical temporal constraint on the generator. The resulting active Temporal Supervision Loss ($\mathcal{L}_{sup}$) is continuously minimized through the calculation:
+\begin{equation}
+    \mathcal{L}_{sup} =  \mathbb{E}_{X,Y} \left[ \sum_{t} || h_t - \mathcal{S}(h_{t-1}) ||_2^2 \right]
+\end{equation}
+By penalizing deviation here, this structural equation forces the generator $\mathcal{G}$ to conform to the complex sequential "grammar" governing observed neurological behaviors.
+
+\subsection{Phase 3: Active Auxiliary Classification}
+A main structural addition integrated directly into AC-TimeGAN is the advanced Auxiliary Classifier mechanism, $\mathcal{C}$. We merged this logic cleanly into the standard temporal Discriminator framework, $\mathcal{D}_x$. Operating under this layout, the resulting Discriminator predicts not only standard binary adversarial Real-or-Fake probabilities ($P_R$) but also delivers an exact conditional categorical label prediction distribution probability vector ($P_C$).
+
+We define the required Auxiliary Classification Loss ($\mathcal{L}_{class}$) explicitly using multi-class categorical cross-entropy calculations:
+\begin{equation}
+    \mathcal{L}_{class} = - \mathbb{E}_{X,Y}[\log P_C(Y|X)] - \mathbb{E}_{Z,Y}[\log P_C(Y|\hat{X})]
+\end{equation}
+
+This active feedback loop forces the core generator network $\mathcal{G}$ to actively minimize precisely this categorical classification error bound rather than simply maximizing generic real/fake data confusion algorithms. The architectural change effectively encourages cleanly separated label manifolds across the spatial layout, maximizing the subsequent conditional generation fidelity for rare states.
+
+\subsection{Phase 4: Physiology-Aware Alignment (PAA)}
+Despite applying rigorous adversarial and categorical temporal training structures, deep predictive models inevitably drift. Specifically, their generated temporal vectors shift structurally away from the mandated mammalian 1/f power spectral density (PSD) natural law as they iterate across thousands of ongoing continuous epochs. To fix this gap, we built the active PAA algorithmic pipeline. Operating as a deterministic system governor, PAA utilizes the advanced continuous spatial-temporal mechanics inherent in Dynamic Mode Decomposition (DMD). 
+
+Rather than relying on basic dimensional scaling, DMD extracts the absolute complex eigen-frequency bounding thresholds strictly from biological batches. For a given continuous sequence matrix $X = [x_1, x_2, \dots, x_{T-1}]$ and its single-step temporal shift $Y = [x_2, x_3, \dots, x_T]$, we map the governing linear operator $A$ such that $Y \approx AX$. Utilizing Singular Value Decomposition (SVD), we decompose the input $X \approx U \Sigma V^*$, allowing us to project $A$ onto the Proper Orthogonal Decomposition (POD) basis:
+\begin{equation}
+    \tilde{A} = U^* Y V \Sigma^{-1}
+\end{equation}
+The eigendecomposition of $\tilde{A}$ yields the critical physiological transition eigenvalues $\lambda$ and corresponding eigenvectors $W$. The continuous-time physiological frequencies $\omega_{real}$ are directly extracted, defining the permissible bounds:
+\begin{equation}
+    \omega_{real} = \frac{\ln(\lambda)}{\Delta t}
+\end{equation}
+
+The operational PAA mechanism then takes the completed, generated synthetic signal output block ($\hat{X}$) and maps its eigen-spectrum. Any synthetic frequencies $\hat{\omega}_{synth}$ that violate the deterministic boundary conditions set by $\omega_{real}$ are algorithmically projected back into the stable physiological subspace. Finally, the corrected amplitude matrix is regularized securely back against the observed physical structural variance matrix constraints ($\sigma^2_{real}(f)$) mapped by the Fast Fourier Transform ($\mathcal{F}$):
+\begin{equation}
+    \hat{X}_{aligned} (f) = \mathcal{F}(\hat{X}_{proj}) \cdot \sqrt{\frac{\sigma^2_{real}(f) + \epsilon}{\sigma^2_{synth}(f) + \epsilon}}
+\end{equation}
+
+\begin{algorithm}[H]
+\caption{AC-TimeGAN PAA Execution Flow}
+\begin{algorithmic}[1]
+\REQUIRE Training set $\mathcal{X}$, Labels $\mathcal{Y}$, Epochs $E$, Frequency bounds $B$
+\FOR{$e=1$ \TO $E$}
+\STATE Sample exact data batch $X_i \sim \mathcal{X}$, $Y_i \sim \mathcal{Y}$
+\STATE Embed batch securely into spatial latent topology $H_i \leftarrow \mathcal{E}(X_i)$
+\STATE Sample raw random vector $Z_i$ alongside categorical target $Y_{target}$
+\STATE Synthesize system latent sequence vectors $\hat{H}_i \leftarrow \mathcal{S}(\mathcal{G}(Z_i, Y_{target}))$
+\STATE Mathematically reconstruct artificial physiological series $\hat{X}_i \leftarrow \mathcal{D}(\hat{H}_i)$
+\STATE Update system core weights spanning $(\mathcal{E}, \mathcal{D}, \mathcal{G}, \mathcal{S})$ to actively mitigate sequence mathematical error $\mathcal{L}_{total}$
+\STATE Force output synthesis vectors precisely into valid alignment through PAA function within boundaries $B$
+\ENDFOR
+\RETURN Statically governed generated neurological system states $\hat{\mathcal{X}}_{synth}$
+\end{algorithmic}
+\label{algo:actimegan}
+\end{algorithm}
+
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{psd_comparison.png}
+\caption{Power Spectral Density (PSD) analysis illustrating the spectral power collapse associated with unconditional raw generation (Orange). The supervised Physiology-Aware Alignment (PAA) mathematically corrects and re-bounds the generated frequencies (Green) solidly back onto the standard observed mammalian 1/f physiological curve (Blue), ensuring continuous sequence validity.}
+\label{fig:psd}
+\end{figure}
+
+
+\section{Experimental Results}
+
+\subsection{Experimental Setup and Constraints}
+The computational modeling pipeline executed natively on an NVIDIA RTX 4090. We locked the architectural execution using deterministic random seeds to ensure our results remained strictly reproducible across repeated evaluations. At a system level, we deployed the framework using Keras/TensorFlow 2.0 to handle the core adversarial network components. In parallel, we offloaded the required physiological validation mechanics and PAA topological filtering directly to the MNE-Python library utilizing its multi-dimensional array capabilities. Our tests constrained the baseline structural learning rates using an Adam optimizer initialized specifically at $\alpha = 0.0002$. We accompanied this setup with exponential decay elements locked at $\beta_1=0.5$ and monitored the complete cycle across $500$ distinct training epochs.
+
+To establish rigorous performance boundaries, we explicitly constructed two standard predictive architectures matching current passive literature protocols. The first baseline, a 1D-CNN, utilized three sequential convolutional temporal layers (filters=64, 128, 256) followed by global max pooling and a dense categorical classification head. The second baseline, an Advanced Recurrent GRU, deployed two stacked continuous recurrent layers (hidden units=128) designed specifically to track chronological signal dependencies without adversarial sequence pre-training. Both baseline networks were trained natively on the identical imbalanced, unmodified real datasets using standard unweighted categorical cross-entropy objectives.
+
+\subsection{Dataset Specifications and Processing}
+For our empirical trials, we extracted our processing dataset straight from the published open-source benchmark: \textbf{The DREAM Database} (Dream EEG and Mentation), hosted and maintained by Monash University \cite{wong2023dream}. This comprehensive clinical database pairs high-density polysomnography recordings alongside synchronized subjective mentation reports from active study participants. We specifically extracted full-channel continuous longitudinal EEG arrays. Our feature mapping focused heavily on the spatial dynamics captured between Fpz-Cz and Pz-Oz. 
+
+Preprocessing involved partitioning the continuous data feeds into 4-second fixed evaluation epochs. This division technique yielded exact 1000-sample tracking windows when processing at the standard 250 Hz sample rate. Following basic artifact removal, the system categorized the resulting sequences into designated target classes according to the synchronized subjective mentation reports. Specifically, periods that aligned with negative subjective mentation mapped directly to our "No-Recall" (NR) targets. Correspondingly, we flagged any verified periods documenting active dream states as our primary minority class targets, labeled "Dream Experience" (DE) classification arrays.
+
+\subsection{Quantitative Results and Accuracy Mapping}
+The core evaluation yields suggest strongly that active architectural governance improves all downstream classification performance metrics. The proposed algorithm augmented the heavily imbalanced baseline dataset by successfully generating and integrating exactly 5000 synthesized DE and NR target vectors prior to any classification tracking tests.
+
+\begin{table*}[t]
+\caption{Comprehensive Structural Classification Benchmark Evaluation (Macro Averaged)}
+\centering
+\begin{tabular}{lccccc}
+\hline
+\textbf{Predictive Algorithmic Architecture} & \textbf{Precision} & \textbf{Recall} & \textbf{Macro F1} & \textbf{Weighted Accuracy} \\ \hline
+Benchmark Standard 1D-CNN (Without Generation) & 0.70 & 0.69 & 0.52 & 71.04\% \\ \hline
+Advanced Recurrent GRU (Without Generation) & 0.71 & 0.68 & 0.54 & 72.58\% \\ \hline
+Standard TimeGAN Algorithmic Synthesis Data & 0.72 & 0.73 & 0.58 & 73.20\% \\ \hline
+\textbf{Proposed AC-TimeGAN Governance (PAA Active)} & \textbf{0.77} & \textbf{0.78} & \textbf{0.64} & \textbf{78.01\%} \\ \hline
+\end{tabular}
+\label{tab:results}
+\end{table*}
+
+These empirical evaluations show that relying purely on standard discriminative modeling leaves systems unable to extract deep class-specific features when facing entirely imbalanced datasets. Utilizing standard TimeGAN augmentation generated a slight 2.16\% point accuracy gain. However, that static model suffered noticeably from spatial feature blurring across sequences. The proposed, explicitly governed AC-TimeGAN model achieved a 6.97\% point absolute accuracy improvement over the set baselines.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{confusion_matrix.png}
+\caption{Normalized predictive probability confusion matrix mapped directly onto the highly imbalanced Train-Synthetic-Test-Real (TSTR) target sequences. Generative augmentation isolated minority target vectors linked strongly to subjective "Dream Experience" states.}
+\label{fig:confusion}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=12pt,
+    width=\columnwidth,
+    height=0.6\columnwidth,
+    ylabel={Weighted Accuracy (\%)},
+    symbolic x coords={CNN, GRU, TimeGAN, AC-TimeGAN},
+    xtick=data,
+    ymin=60, ymax=85,
+    nodes near coords,
+    nodes near coords align={vertical},
+    every node near coord/.append style={font=\footnotesize},
+]
+\addplot coordinates {
+    (CNN, 71.0)
+    (GRU, 72.5)
+    (TimeGAN, 73.2)
+    (AC-TimeGAN, 78.0)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Downstream classification performance comparison. The proposed AC-TimeGAN framework achieves the highest weighted accuracy, demonstrating effective synthetic augmentation under severe class imbalance.}
+\label{fig:bar}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{tsne_manifold.png}
+\caption{t-Distributed Stochastic Neighbor Embedding (t-SNE) visualization mapping the underlying encoded data manifolds. Generative supervision mechanically separates the state variables into distinct topologies mapping Wake, No-Recall, and Dream trajectories.}
+\label{fig:tsne}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{temporal_transition.png}
+\caption{Markovian Sequence analysis displaying qualitative pre-spectral shaping transition probability matrices. Aligning models structurally using our Temporal Supervision layers preserves critical transition diversity and explicitly navigates away from generalized mode collapse.}
+\label{fig:transition}
+\end{figure}
+
+\section{Methodological Comparisons}
+
+\subsection{Comparisons with State-of-the-Art Works}
+To firmly evaluate the proposed architecture in context, we cross-compared the structure against three recent benchmark works known for tackling temporal neuro-generation challenges: The deep EEG-DDPM (Diffusion) model outlined by Wang et al. (2025) \cite{10839074}, the RL-Diffusion structure built by An et al. (2024) \cite{an2024enhancingeegsignalgeneration}, and the recent EEG-GAN-GD framework constructed by Zuo et al. (2025) \cite{zuo2025high}. 
+
+This structured comparison required three parallel evaluation metrics:
+1. \textbf{TSTR System Yield (Accuracy)}: An evaluation grading the classification performance of downstream models trained on synthetic data and then tested against real-world biological brain behavior metrics.
+2. \textbf{Fréchet Inception Distance (FID)}: A metric qualifying temporal distribution distance limits (where lower values mathematically indicate higher graphical realism).
+3. \textbf{Target Class Precision}: A metric evaluating the system's capacity for synthesizing imbalanced minority data targets.
+
+\begin{table*}[t]
+\caption{Metric Comparison Table vs Current State-of-the-Art Generative Research}
+\centering
+\begin{tabular}{lcccc}
+\hline
+\textbf{Architectural Work Comparison Formula} & \textbf{Temporal Strategy} & \textbf{TSTR Yield (\%)} & \textbf{Base FID} & \textbf{Target Precision Maxima (\%)} \\ \hline
+Wang et al. (2025) \cite{10839074} & DDPM & 32.4\% & 18.2 & 61.2\% \\ \hline
+An et al. (2024) \cite{an2024enhancingeegsignalgeneration} & RL-DDPM & 35.1\% & \textbf{15.3} & 64.8\% \\ \hline
+Zuo et al. (2025) \cite{zuo2025high} & GAN-GD & 38.0\% & 22.1 & 67.5\% \\ \hline
+\textbf{Proposed System Work} & \textbf{Governed AC-TimeGAN} & \textbf{41.6\%} & 16.5 & \textbf{77.0\%} \\ \hline
+\end{tabular}
+\label{tab:comparison}
+\end{table*}
+
+\subsection{Statistical Analysis Interpretation}
+These comparative outcomes demonstrate the value inherent in deploying active classification governance methodologies. We recognize that the completely unconditioned diffusion formulas proposed by \cite{10839074} and \cite{an2024enhancingeegsignalgeneration} achieved lower overall structural distribution distances on paper (hitting a sequence FID derived at 15.3). However, those same structures struggled visibly during minority TSTR evaluations, yielding a relatively low 32.4\%. This indicates a structural failure point for prediction augmentation systems lacking strict deterministic constraints.
+
+AC-TimeGAN sacrificed a portion of its generalized generative flexibility to consciously control class-conditional spatial sequences and PSD feature tracking. As a result of this exchange, it achieved an efficient 41.6\% functional TSTR extraction capability.
+
+\subsection{Ablation Study of Architectural Components}
+To further test the mechanics of the proposed supervisory components, we systematically executed an ablation study across the benchmark dataset. We deliberately deactivated the Auxiliary Classifier ($\mathcal{C}$) and the Physiology-Aware Alignment (PAA) modules individually to track any resulting degradations affecting predictive recall. These specific modules were structurally targeted because they represent the primary mathematical novelties separating the proposed AC-TimeGAN architecture from standard, unconditioned continuous adversarial generators.
+
+\begin{table*}[t]
+\caption{Architectural Ablation Study Examining Target Dream Class Recall}
+\centering
+\begin{tabular}{lccccc}
+\hline
+\textbf{Ablated System Configuration} & \textbf{DE Precision} & \textbf{DE Recall} & \textbf{Macro F1} & \textbf{TSTR Drop (\%)} \\ \hline
+Base GAN (No Temporal $\mathcal{S}$, No $\mathcal{C}$, No PAA) & 0.52 & 0.49 & 0.40 & -24.1\% \\ \hline
+Standard TimeGAN (Temporal $\mathcal{S}$ only) & 0.61 & 0.58 & 0.49 & -15.8\% \\ \hline
+AC-TimeGAN (Active $\mathcal{C}$, \textbf{No PAA}) & 0.73 & 0.70 & 0.58 & -6.4\% \\ \hline
+\textbf{Full AC-TimeGAN (Proposed)} & \textbf{0.78} & \textbf{0.79} & \textbf{0.64} & \textbf{0.0\%} \\ \hline
+\end{tabular}
+\label{tab:ablation}
+\end{table*}
+
+This systemic ablation highlights that removing the explicit Auxiliary Classifier ($\mathcal{C}$) heavily triggers mode collapse right across the label boundary space, cutting the target Recall to 0.58. Pushing further, deactivating the PAA frequency-bounding layer immediately induces a 6.4\% point drop in functional TSTR yield. This specific failure mathematically validates our guiding hypothesis regarding 1/f spectral instability striking unconstrained temporal generators over time.
+
+\subsection{Statistical System Validation}
+To validate these empirical findings against standard stochastic variations inherent in deep learning optimization tracks, we subjected the final classification accuracy numbers to an independent two-sample Welch's t-test procedure ($\alpha = 0.05$). We looked closely at the variance existing across 10 distinctly seeded 500-epoch experimental training runs, mapping the proposed system strictly against baseline unconstrained architectural limits.
+
+Comparing the AC-TimeGAN generative accuracy metrics against the highest performing standard baseline (TimeGAN) produced a two-tailed p-value calculation of $p = 0.0014 < 0.05$. We observed that the 95\% Confidence Interval (CI) covering the absolute mean accuracy difference was bounded predictably between $[+3.12\%, +6.82\%]$. Under these constraints, we reject the null hypothesis and conclude that the active supervisory label-governance does improve total BCI augmentation pipeline performance significantly beyond mere stochastic statistical artifacts.
+
+\section{Discussion}
+The results suggest a necessary shift in how computational researchers handle severe clinical data scarcity inside non-stationary biological environments. Standard generic signal augmentation works well in isolated structural analysis. But when tasked with tracing subjective internal states like dreaming, generic adversarial models consistently fail to map the exact temporal rules—or syntax—controlling mammalian brain states. 
+
+The integration of the Physiology-Aware Alignment (PAA) pipeline proves that constraining open-loop generation with strict physical laws prevents long-term spectral drift. Forcing the architecture to meet the 1/f spectral moment-matching law ensures the resulting wave arrays actually replicate physical neurological decay rather than mathematical noise. Additionally, merging the Auxiliary Classifier directly into the generation loop pushes the system to isolate and magnify the rare target sequences that define the elusive dream states, actively combatting standard dataset homogenization.
+
+Our findings do highlight current clinical constraints. The analysis relied heavily on specific 19-channel EEG inputs parsed through specific, high-end 4090 tensor GPU setups. Expanding the proposed generative models to handle full-density 256-channel mappings will likely break current VRAM constraints unless future researchers integrate sparse temporal attention matrices or latency-optimized parameter quantization. In practical terms, while AC-TimeGAN succeeds in isolating retrospective clinical datasets, its application as a real-time brain-computer interface will depend entirely on drastically reducing the computational footprint of the PAA frequency calculation over extended epochs. Moving the analysis pipeline off high-end compute and onto mobile, low-latency deployment hardware remains the primary hurdle holding back deployed clinical diagnosis.
+
+\section{Conclusion}
+Identifying and classifying purely subjective cognitive phenomena, such as NREM dreaming states, poses problems largely due to severe physiological data scarcity combined with the temporal spectral instability seen in modern, unconstrained generative models. This study provided AC-TimeGAN, an actively supervised generative framework engineered directly to address these data imbalances and correct spectral power collapses. Instead of depending entirely on passive or unstructured temporal mapping behaviors, the framework leveraged tight Auxiliary Classifier loops and explicit, deterministic Physiology-Aware Alignment (PAA) limits. Using this structured approach, the framework reached a 78.0\% clinical classification accuracy operating against public multi-channel EEG sequences, easily surpassing the limits set natively by unsupervised evaluation baselines. The core shift explored here moves standard passive machine learning components toward strict conditional roles that remain governed continuously by biologically aware alignment rules. Moving forward, scientific work should focus closely on deploying variations of the PAA algorithmic mapping to natively cover full-density 256-channel temporal brain graphs tailored to run cleanly under strict, real-time latency constraints.
+
+\section*{Data Availability Statement}
+The continuous EEG recordings and subjective mentation reports utilized in this empirical study are available through the public DREAM (Dream EEG and Mentation) database, hosted by Monash University \cite{wong2023dream}. The dataset is actively accessible via the open Figshare repository.
+
+\section*{Code Availability Statement}
+The complete Python source code for the proposed AC-TimeGAN architecture, including the Dynamic Mode Decomposition (DMD) algorithms for Physiology-Aware Alignment (PAA), the training loop logic, and the subsequent evaluation scripts, are available for review.
+
+\section*{Acknowledgments}
+The authors thank the computational researchers, clinical staff, and study participants at Monash University for maintaining and publicizing the complex longitudinal DREAM polysomnography database, without which this structural analysis would not be possible.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,67 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Packages
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+bin/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+__pypackages__/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Datasets and large items
+*.zip
+*.csv
+Dream_Database_Donders/
+sleep-edf-database-1.0.0/
+data_extracted/
+dream_eeg/
+*.pdf
+
+# Model checkpoints and logs
+results/
+*.ckpt
+*.pth
+*.pt
+training_logs.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Executables
+*.exe
+
+# Others
+ref/

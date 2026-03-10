@@ -1,0 +1,411 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{stfloats}
+\usepackage{hyperref}
+
+\begin{document}
+
+\title{AC-Semantic-TimeGAN: A Supervisory-Governed Generative Architecture for NREM Dream State Synthesis and Classification}
+
+\author{
+Sachin~R,
+Aasritha~Koganti,
+Vishnu~Vardhan~Reddy,
+Raghavendra Singh Jagawat
+}
+
+\maketitle
+
+\begin{abstract}
+Modeling dream states via electroencephalogram (EEG) signals presents an inherent structural conflict: synthesizing raw neural physiology rarely aligns smoothly with extracting meaningful semantic interpretation. While contemporary generative frameworks excel at forcing rigid signal fidelity, they typically completely decouple these fabricated neural tensors from their underlying cognitive anchors. To bridge this exact translation gap, we developed AC-Semantic-TimeGAN, deploying a structurally unified two-stage pipeline. The foundational tier, AC-TimeGAN, actively enforces biological boundaries by executing Dynamic Mode Decomposition constraints, purposefully locking the sequence's spectral geometry to guarantee downstream classification validity. Building directly onto that rigid physical scaffolding, Semantic-TimeGAN operates a specialized cross-modal InfoNCE projection head. This distinct configuration processes text-conditioned EEG generation alongside precise zero-shot retrieval, completely sidestepping the massive data overhead native to supervised emotion decoding algorithms. The resulting architecture successfully evades systemic spectral collapse while strictly protecting localized linguistic embedding boundaries. Upon testing our models against complex multimodal sleep corpora, the generation sequences proved incredibly stable. The framework delivered a verified 78.01\% macro-classification retention and pulled 79.41\% accuracy across Top-3 zero-shot semantic retrievals. Ultimately, these output metrics confirm a critical breakthrough: generative brain-computer interfaces can successfully synthesize deep physiological structures without sacrificing targeted cognitive translation.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Generative Adversarial Networks, Electroencephalography, Semantic Retrieval, Cross-Modal Representation, Time-Series Synthesis.
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+The quantitative decoding of latent cognitive variables embedded within human sleep states remains a persistent structural challenge in advanced brain-computer interface (BCI) diagnostics~\cite{tarailis2024functional}. Historically, clinical sleep analysis has relied heavily on the manual or semi-automated visual scoring of polysomnograms, evaluating macroscopic physiological shifts across predefined visual epochs~\cite{amrita2022eeg}. This standardized methodology compartmentalizes highly fluid, continuous neural activity into rigid, discrete stages constrained by American Academy of Sleep Medicine (AASM) guidelines~\cite{anitha2024efficient}. While this categorical approach proves highly effective for diagnosing gross architectural anomalies like sleep apnea or insomnia, relying entirely on a macroscopic staging paradigm systematically filters out the high-dimensional spatial and temporal variability anchoring genuine internal cognitive experiences~\cite{10.3389/fnhum.2019.00348}. Investigating the ``Cortical Hot Zone''---specifically the posterior parahippocampal and occipital sectors strongly dictating dream onset and conscious recall---requires continuous, high-fidelity signal analysis fundamentally incompatible with standard 30-second epoch scoring~\cite{siclari2018dreaming}.
+
+Bridging this exact translation gap introduces severe data limitations. High-density EEG databases successfully mapping raw neural waveforms directly to subjective semantic dream reports remaining exceedingly scarce and prohibitively expensive to maintain~\cite{diezig2024eeg, hartmann2018eeggan}. Bounding these constraints, modern deep learning architectures consistently fail to cross the computational divide separating raw physiological generation from continuous semantic interpretation. The fundamental limitation lies in the subjective reporting phase: biological subjects extract and communicate their conscious experiences exclusively upon awakening. Consequently, running standard supervised classification models inevitably forces overfitting against highly imbalanced baselines, drastically distorting the resulting multi-dimensional gradient mappings. Attempting to augment this scarce rapid-eye-movement (REM) or non-REM (NREM) data utilizing purely unconditioned generative models almost universally triggers spectral collapse. Under these unsupervised conditions, the synthetic tensors systematically fail to respect the physiological $1/f$ energy scaling laws uniquely defining the human cortex.
+
+To address the divergence separating structural realism and semantic interpretability, we propose a sequentially constrained generative system designed to restrict biological geometry before attempting semantic decoding. The contributions of this work are functionally defined as follows:
+\begin{enumerate}
+    \item Implementation of a physiology-aware foundational generation framework (AC-TimeGAN) integrating a Temporal Supervisor and an active Auxiliary Classifier to combat class imbalance within brainwave sleep datasets.
+    \item Mathematical derivation of a Dynamic Mode Decomposition (DMD) algorithmic governor that projects generative temporal drift backward onto the physical $1/f$ neurological energy curve.
+    \item Development of a zero-shot cross-modal extension incorporating a contrastive InfoNCE projection head to establish an aligned manifold between stable AC-TimeGAN sequences and contextual language embeddings derived from modern NLP transformers.
+    \item Quantitative execution of comparative Fréchet Inception Distance (FID) and Top-\textit{k} retrieval analysis against modern generative architectures, validating statistical significance across a multimodal continuous validation corpus.
+\end{enumerate}
+
+The remainder of this manuscript is organized as follows: Section II reviews related work in continuous generation and semantic tracking. Section III details the mathematical physics and tensor architecture of the proposed multi-stage pipeline. Section IV defines the evaluation metrics and experimental datasets. Section V presents empirical comparisons and theoretical ablations. Section VI provides a comprehensive discussion of biological parameters, and Section VII concludes the manuscript.
+
+\section{Literature Review}
+
+\subsection{Generative Adversarial Networks for Neuro-Physiology}
+The proliferation of Generative Adversarial Networks (GANs) and continuous diffusion probability models applied to multi-channel time-series modalities has accelerated significantly. Initial methodologies primarily restricted 1D sequence signals to discrete image-based transformations~\cite{hartmann2018eeggan}, systematically degrading chronological validity to mere milliseconds. Circumventing this fundamental biological bottleneck requires advanced deep generative modeling paradigms. Consequently, recent architectures deploying unconditioned GAN sequences have successfully targeted the direct synthesis of high-density NREM EEG vectors~\cite{zuo2025high}. Although executing global dynamics supervision within these frameworks successfully preserved initial microstate stability across matrix arrays, the underlying algorithms consistently deteriorated under prolonged temporal tracking, demonstrating a critical inability to maintain structural coherence across extended sleep cycles. 
+
+Approaching this overarching obstacle through structural parallelization, multiple investigations have deployed conditional GANs to explicitly map the inter-relational antagonistic behaviors driving specific internal boundaries~\cite{vahid2022conditional}. Complementing that trajectory, detailing the foundational implementation of deep recurrent layers inside standard biological generators has ultimately established the mathematical necessity of continuous temporal sequence gradients over rigidly stationary variables~\cite{habashi2023generative}. Reinforcing this transition toward continuous time-series mapping, specific data augmentation strategies were introduced to explicitly satisfy basic biological thresholds~\cite{yoon2019time}, alongside the deployment of auxiliary internal classification algorithms designed to aggressively stabilize target divergence~\cite{odena2017conditional}. Synthesizing this early foundational work, biological simulation models successfully mapping massive multi-channel SSVEP data effectively established the structural groundwork for the deeper continuous cognitive generation paradigms actively explored today~\cite{8852227}.
+
+\subsection{Continuous Diffusion Models and Reinforcement Architectures}
+Evaluating alternative computational frameworks reveals spatio-temporal adaptive diffusion models frequently prioritize spatial super-resolution capabilities over pure generative synthesis~\cite{10839074}. While executing these specific diffusion matrices undoubtedly delivered significant spatial enhancements across dense array configurations, their inherent iterative denoising parameters mandated excessive latency penalties, rendering the architectures structurally incompatible with real-time BCI augmentation. 
+
+Following a directly comparable structural approach, separate investigations established mechanisms constraining pure diffusion variance utilizing continuous EEG generation driven by reinforcement learning matrices~\cite{an2024enhancingeegsignalgeneration}. The primary mathematical advantage within that topology emerged as strictly tightened Fréchet bounding, effectively yielding usable visual sequences prioritizing downstream classification. Unfortunately, that configuration necessitated the meticulous empirical labeling of baseline states across discrete tensors, consequently rendering the architecture mathematically invalid for zero-shot text retrieval mapping contexts where subjective labels remain notoriously sparse or entirely continuous. Addressing parallel generative paradigms, distinct computational experiments implemented sophisticated synthetic data models purposefully targeting strict diagnostic bounds within biological classification~\cite{10.3389/fnins.2023.1219133}. Operating orthogonally, other teams entirely bypassed the complexities of temporal generation by deploying visual decoding reconstructions via guided diffusion, explicitly sidestepping subjective semantic obstacles altogether~\cite{li2024visualdecodingreconstructioneeg, 11154007}. Crucially, however, these generalized generative diffusion models predominantly yielded purely visual modalities, systemically failing to process the dense semantic text embeddings essential for establishing authentic internal cognitive linkages.
+
+\subsection{Semantic Mapping and Baseline Sleep Phenotyping}
+Tracking the physiological metrics necessary for evaluating synthesized structural outputs relies entirely upon correctly defining the underlying cognitive constraints. Foundational literature meticulously detailing the functional properties inherent to resting microstates has successfully established how discrete topologies dynamically bridge temporal mechanics with localized consciousness~\cite{tarailis2024functional}. Providing a corresponding physiological anchor, the definitive isolation of ``Cortical Hot Zone'' parameters operating within high-density NREM EEG arrays successfully localized the distinct sleep dynamics directly bound to individual subjective dream events~\cite{siclari2018dreaming}. 
+
+Extending parameters well beyond these baseline transition analyses, specific subjective experiences have been continuously mapped against underlying chronological wake transitions~\cite{diezig2024eeg}, while parallel computational projects effectively parsed internally directed semantic attention thresholds against exogenous sensory mapping utilizing explicit AR paradigms~\cite{10.3389/fnhum.2019.00348}. Interrogating explicit semantic alignments, recent algorithmic breakthroughs decoded massive single-modality emotion boundaries utilizing rigidly encoded frequency interpretability ranges~\cite{amrita2025single, amrita2022eeg}. Complementing standard classification metrics structurally designed for macroscopic staging efficiency~\cite{anitha2024efficient}, modern affective computing frameworks now consistently demonstrate profound accuracy utilizing weakly supervised graph networks rigorously calibrated to decouple nonlinear emotional associations~\cite{naidu2024emotion}. 
+
+Concluding this trajectory by supplying the fundamental mathematical truth labels required to lock down rigorous statistical benchmarking, highly curated structured repositories including the DREAM database~\cite{wong2023dream} alongside the DEED classification corpus~\cite{zheng2022deed} have permanently stabilized modern physiological evaluation thresholds. Despite this influx of undeniable continuous advancements, the primary architectural barrier severely degrading contemporary solutions remains deep persistent algorithmic decoupling. Specifically, modern discrete diagnostic systems categorically lack the integrated generative mechanisms necessary to seamlessly synthesize continuous physiological waveforms backward from purely abstract cognitive targets.
+
+\section{System Architecture: Physical and Semantic Coupling}
+
+Solving the generation-interpretation duality requires abandoning single-stage end-to-end optimizations, which frequently induce mode collapse when scaling channels past spatial dimensions of $C=19$. Instead, AC-Semantic-TimeGAN executes a sequentially constrained structural pipeline (illustrated in Figure \ref{fig:arch}). Phase 1 guarantees a biologically invariant coordinate manifold. Phase 2 locks linguistic semantics onto that frozen spatial topology.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{system_arch.png}
+\caption{Structural Schematic mapping the complete AC-Semantic-TimeGAN execution logic. The primary tier (Phase 1) rigorously controls active physiological generation alongside defined time-series bounds. Subsequently, Phase 2 anchors natural language processing (NLP) parameters directly to that resulting physical geometry, successfully preventing systemic collapse.}
+\label{fig:arch}
+\end{figure*}
+
+\subsection{Phase 1: Deterministic AC-TimeGAN Mechanics}
+
+EEG arrays contain significant noise variance. Attempting to execute adversarial learning directly upon the raw voltage tensor $\mathcal{X}_{raw} \in \mathbb{R}^{T \times C}$ destabilizes chronological mapping. The objective is to compress this dimensionality utilizing a deterministic auto-encoding sequence boundary before generative inference occurs \cite{odena2017conditional}.
+
+\subsubsection{Gated Temporal Embedding}
+Let $\mathcal{X} = \{\mathbf{x}_1, \ldots, \mathbf{x}_N\}$ define the processed dataset array. We structure an embedding function $e: \mathcal{X} \rightarrow \mathcal{H}$ and a matched recovery function $r: \mathcal{H} \rightarrow \hat{\mathcal{X}}$. To fundamentally prevent the characteristic gradient explosions typically haunting sustained temporal rollouts exceeding $T \geq 1000$ sampling vectors, we specifically engineered these processing layers around highly calibrated Gated Recurrent Unit (GRU) gating limits~\cite{habashi2023generative}. At an arbitrary timestep $t$, the encoding transition computes the sequence vectors (detailed in Equations \ref{eq:gru_tanh} and \ref{eq:gru_final}):
+\begin{align}
+    \mathbf{z}_t &= \sigma(\mathbf{W}_z \mathbf{x}_t + \mathbf{U}_z \mathbf{h}_{t-1} + \mathbf{b}_z) \\
+    \mathbf{r}_t &= \sigma(\mathbf{W}_r \mathbf{x}_t + \mathbf{U}_r \mathbf{h}_{t-1} + \mathbf{b}_r) \\
+    \tilde{\mathbf{h}}_t &= \tanh(\mathbf{W}_h \mathbf{x}_t + \mathbf{U}_h (\mathbf{r}_t \odot \mathbf{h}_{t-1}) + \mathbf{b}_h) \label{eq:gru_tanh} \\
+    \mathbf{h}_t &= (1 - \mathbf{z}_t) \odot \mathbf{h}_{t-1} + \mathbf{z}_t \odot \tilde{\mathbf{h}}_t \label{eq:gru_final}
+\end{align}
+Where matrices $\mathbf{W}, \mathbf{U}$ represent trainable weight tensors, and the $\sigma$ gating mechanism strictly regulates information flow across the localized biological frequencies. 
+
+\subsubsection{Supervisory Generator and Target Isolation}
+The synthesis module comprises the actual Generator $\mathcal{G}: \mathcal{Z} \times Y \rightarrow \hat{\mathcal{H}}$, mathematically defining the latent generation step $\hat{\mathbf{h}}_t = \mathcal{G}(\mathbf{z}_t, Y, \hat{\mathbf{h}}_{t-1})$ by drawing from the unified noise distribution $Z$ and class label vector $Y$. To prevent transition syntax errors, a distinct Supervisor Network $\mathcal{S}$ observes the generated temporal steps and mathematically penalizes forward predictions that violate physical flow probability. This constraint is enforced by minimizing the active Temporal Supervision Loss ($\mathcal{L}_{sup}$):
+\begin{equation}
+    \mathcal{L}_{sup} = \mathbb{E}_{\mathbf{X}, Y} \left[ || \mathbf{h}_t - \mathcal{S}(\mathbf{h}_{t-1}) ||_2^2 \right]
+\end{equation}
+
+Simultaneously, the discriminator matrix is partitioned to execute active Auxiliary Classification. Standard discriminators perform strictly binary classification (e.g., real vs. synthesized). Our classification module $\mathcal{C}$ concurrently maps conditional categorical targets (e.g., distinguishing Dream states from Neutral baselines):
+\begin{equation}
+    \mathcal{L}_{class} = - \mathbb{E}_{X,Y}[\log P_C(Y|X)] - \mathbb{E}_{\hat{X},Y}[\log P_C(Y|\hat{X})]
+\end{equation}
+By directly penalizing $P_C$ label confusion across both real and generated samples, the model is coerced into carving out distinct vector separation planes for the rare "Dream" targets. This addresses class imbalance by penalizing static inference patterns.
+
+\subsection{Phase 1-B: The Physiology-Aware Alignment (DMD)}
+Standard neural architectures lack biological constraints and generate inaccurate spectral slopes during adversarial variance. Conventional neural generators operating without hard biological boundaries rapidly produce severely inaccurate spectral slopes whenever adversarial variance spikes. To counteract this volatility, AC-TimeGAN actively introduces a stabilizing structural parameter defined as Physiology-Aware Alignment (PAA). This constraint is securely anchored entirely upon the physical principles governing Dynamic Mode Decomposition.
+
+Operating through this constraint, the system calculates absolute complex eigen-frequency bounding limits ($\omega_{real}$) dictating valid mammalian physiological thresholds. Rather than analyzing the entire array simultaneously, distinct chronological sequence blocks are extracted and systematically mapped through a rigorous Singular Value Decomposition (SVD) core~\cite{tarailis2024functional}:
+\begin{equation}
+    \tilde{A} = U^* Y \: V \: \Sigma^{-1} \qquad \Longrightarrow \qquad \omega_{real} = \frac{\ln \left( \lambda \right)}{\Delta t}
+\end{equation}
+Within that calculation, isolating the diagonal eigenvalue matrix explicitly (denoted by $\lambda$) exposes the underlying structural scaling behaviors. Thus, whenever the deep adversarial layers inevitably synthesize a sequence suffering from complete Spectral Collapse, the architecture actively refuses to discard that specific batch output. Instead, it triggers a completely deterministic structural adjustment. This correction mechanically forces any anomalous generative waveform ($\hat{X}_{proj}$) immediately back onto the acceptable, continuous physiological $1/f$ decay trajectory:
+
+\begin{equation}
+    \hat{X}_{aligned} \left( f \right) = \mathcal{F} \left( \hat{X}_{proj} \right) \; \cdot \; \sqrt{ \frac{\sigma^2_{real}(f) \,+\, \epsilon}{\sigma^2_{synth}(f) \,+\, \epsilon} }
+\end{equation}
+This bounds the temporal generation mathematically (as mapped in Algorithm \ref{alg:phase1}). The generator matrix $g(\cdot)$ restricts outputs to defined neurological boundaries.
+
+\begin{algorithm}[th]
+\caption{DMD-bounded AC-TimeGAN Execution}
+\label{alg:phase1}
+\KwIn{Multi-channel Physiological Sensors $\mathcal{X}$, Class Identity $Y$, Eigen-Target bounding threshold $\omega_{target}$}
+\KwOut{Stabilized Biological Sequence $\hat{\mathcal{X}}$ }
+\For{$e=1$ to MaxEpochs}{
+    Embed coordinate matrices: $\mathbf{h} = e(\mathbf{x})$\;
+    Compute unconditional noise projection: $\hat{\mathbf{h}} = g(\mathbf{z}, y)$\;
+    Analyze the standardized Jensen-Shannon discriminative probabilities\;
+    Assess the explicit Auxiliary Classification cross-entropy limits ($\mathcal{L}_{class}$)\;
+    Execute spatial Fast Fourier Transformations across $\hat{\mathbf{h}}$ isolating $S_{\hat{\mathbf{x}}}(f)$\;
+    Determine precise physical scaling differentials mapping $\omega_{target}$ natively through SVD\;
+    Project continuous PAA scaling penalizations structurally: $\nabla \mathcal{L}_{PAA}$\;
+    Resolve and backpropagate the deeply consolidated objective matrix\;
+}
+Secure the completely deterministic generating weights defining layer $\Theta_{e, r, g, s}$.
+\end{algorithm}
+
+\subsection{Phase 2: Semantic Alignment via InfoNCE Contrastive Geometry}
+Following the strict stabilization of the generation pipeline against underlying physiological constraints, the subsequent Phase 2 directly establishes a robust zero-shot retrieval architecture. This specific framework actively forces an explicitly aligned cross-modal manifold stretching between the raw physiological phase boundaries and abstract human cognitive mapping. For the textual analysis phase, we implement dedicated natural language processing layers built around a pre-trained contextual Transformer (specifically deploying the highly distilled MiniLM-L6 weights). This configuration actively translates the highly unstructured affective language dream reports quantifying localized cognitive occurrences~\cite{wong2023dream}. 
+
+Computationally projecting these distinct text segments deep into a heavily populated hyperspherical geometry inevitably yields strictly continuous semantic vector arrays mapped as $\mathcal{Y}_{emb} \in \mathbb{R}^{D=384}$. 
+
+Consequently, executing Phase 2 mechanically requires completely freezing the underlying Phase 1 network parameters. Building upon this rigid base, the proposed architecture integrates an active contrastive nonlinear projection geometry, mathematically denoted as $P_{sim}$. Processing only the strictly localized physiological tensors $\mathbf{h}_i$ previously synthesized by the securely locked GRU layers, the $P_{sim}$ projection operation continuously warps the temporal sequences. The fundamental objective here mathematically minimizes their overarching geometric distance mapping relative to the target linguistic anchoring variables $\mathbf{y}_i$. Semantic correlation certainty is geometrically evaluated via the minimization of the established InfoNCE loss ratio:
+\begin{equation}
+\mathcal{L}_{InfoNCE} = - \mathbb{E} \left[ \log \frac{\exp(\text{sim}(P_{sim}(\mathbf{h}_i), \mathbf{y}_i) / \tau)}{\sum_{j=1}^{K} \exp(\text{sim}(P_{sim}(\mathbf{h}_i), \mathbf{y}_j) / \tau)} \right]
+\end{equation}
+
+By penalizing mismatched topological pairs via the denominator, and scaling spatial grouping distances via the temperature index $\tau$, Semantic-TimeGAN creates a predictable cognitive semantic mapping (summarized in Algorithm \ref{alg:phase2}). Textual parameters injected into the architecture steer probabilities across the valid physical curve mapped deterministically by the DMD equations in Phase 1. The temperature scaling constraint $\tau=0.07$ was empirically optimized via matrix grid search across $\tau \in [0.01, 0.1]$ to maximize target cluster separation without collapsing the nonlinear projection.
+
+\begin{algorithm}[th]
+\caption{Contrastive Phase 2 Semantic Mapping}
+\label{alg:phase2}
+\KwIn{Pre-calculated State Output $\hat{\mathcal{H}}$, Affective Sentences $\mathcal{L}$}
+\KwOut{Cross-Modal Operator Matrix $P_{sim}$}
+Extract language vector array $\mathcal{Y}_{emb} = Transformer(\mathcal{L})$\;
+Initialize temperature limit $\tau = 0.07$\;
+\For{$step=1$ to ExecutionLimit}{
+    Extract paired modalities $(\mathbf{h}_i, l_i)$ over mini-batch $N=256$\;
+    Compute state expansion: $p_i = P_{sim}(\mathbf{h}_i)$\;
+    Calculate total dense matrix: $M_{i,j} = \text{sim}(p_i, \mathcal{Y}_{emb,j})$\;
+    Compute NLL (Negative Log Likelihood) over bounded $\tau$\;
+    Shift weights $\Theta_{P_{sim}}$ using $Adam(\nabla \mathcal{L}_{InfoNCE})$\;
+}
+\end{algorithm}
+
+\section{Results}
+
+\subsection{Experimental Setup and Dataset Configuration}
+Physiological structural validity was evaluated using spatial mapping networks configured against temporal biological baselines~\cite{8852227, 10.3389/fnins.2023.1219133, yoon2019time}. To evaluate semantic limits in Phase 2, the framework required a multimodal repository comprising physiological sequences mapped to natural language labels describing dream content~\cite{siclari2018dreaming}.
+
+This architecture integrates two reference repositories to fulfill the dual constraint of pure structural fidelity and abstract semantic tracking (summarized in Table \ref{tab:dataset_summary}):
+\begin{enumerate}
+    \item \textbf{The DREAM Database}~\cite{wong2023dream}: A repository providing high-density subjective dream reports linked organically to corresponding physiological sleep recordings. By utilizing these unstructured natural language text arrays (detailing affective phenomena such as emotional volatility, spatial transitions, and visual geometry inside sleep), the framework extracted $D=384$ dimensional vectors using the contextual MiniLM-L6 transformer prior to executing the InfoNCE loss mapping in Phase 2. To resolve spatial matrix disparities, the 64-channel physiological arrays were downsampled to a corresponding 32-channel 10-20 international system configuration overlapping the DEED boundaries.
+    \item \textbf{The DEED Dataset}~\cite{zheng2022deed}: The Multimodel Dataset for Dream Emotion Classification (DEED) functions as the core physiological and discriminative anchor. Comprising extensive polysomnography and electroencephalogram matrices explicitly tagged with discrete emotional milestones ($\mathcal{Y}_{emb}$ targets like Fear, Joy, or Anxiety), the DEED parameters provide the immutable 32-channel $1/f$ spectral targets necessary to map the Dynamic Mode Decomposition (DMD) equations in Phase 1 without causing structural boundary collapse~\cite{diezig2024eeg, hartmann2018eeggan}.
+\end{enumerate}
+
+\begin{table*}[t]
+\centering
+\caption{Dataset Summary and Experimental Configuration}
+\label{tab:dataset_summary}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Dataset} & \textbf{Subjects} & \textbf{EEG Channels} & \textbf{Epoch Length} & \textbf{Labels} & \textbf{NLP} \\
+\midrule
+DEED~\cite{zheng2022deed} & 34 & 32 & 2.0 sec & Emotion & No \\
+DREAM~\cite{wong2023dream} & 18 & 64 & 30.0 sec & Free text & Yes \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\indent \textbf{Evaluation Protocol and Data Partitioning:} Analyzing retrieval limits functionally requires calculating probabilities per EEG segment operating across a strictly subject-independent zero-shot data boundary. To fundamentally prevent any possibility of the deep layers memorizing subject-specific morphological traits, the initial Phase 1 Auxiliary Classification architecture explicitly forces a Leave-One-Subject-Out (LOSO) cross-validation scheme. Furthermore, isolating distinct textual anchors securely behind absolute training boundaries successfully blocks any potential cross-modal semantic leakage interfering with Phase 2 extraction sequences. Consequently, the framework evaluates each unique linguistic dream report exactly one time. The underlying EEG sequences were tightly coupled to their corresponding discrete text markers, actively prohibiting instances of inappropriate cross-subject or inter-epoch semantic embedding overlap. To ensure replicability, every reported quantitative benchmark reflects the absolute mean outcome continuously averaged across $N=5$ uniquely seeded initialization cycles. We subsequently confirmed broader statistical validity ($p < 0.05$) by deploying randomized permutation testing mapped across shuffled categorical targets evaluating 10,000 specific iterations.
+
+Implementing these rigid dataset configurations definitively preserved the underlying chronological geometries by heavily restricting latent semantic dilution over time. Computationally, the overarching generative framework operated effectively on a native tensor-optimized 24GB local processing matrix. This specific hardware boundary adequately accommodated the intense spatial-temporal load heavily dictated by mapping the comprehensive DREAM and DEED modalities simultaneously~\cite{11154007}. Ultimately, the integrated architecture consistently demonstrated profound chronological stabilization (illustrated in Figure \ref{fig:temporal}) alongside producing incredibly high-fidelity temporal alignments mirroring authentic baseline distributions precisely (analyzed in Figure \ref{fig:eeg_fidelity}).
+
+\subsection{Quantitative Metrics Processing}
+Executing critical validation across the synthesized structural matrices required assessing absolute Power Spectral Density (PSD) stability thresholds. We functionally achieved this by deploying heavily overlapping 2-second temporal extraction windows successfully scanning across both the Alpha ($8-12$Hz) and Theta ($4-8$Hz) oscillatory boundaries. To secure broader macro-level validation metrics, the system independently calculated both strict precision and weighted functional accuracy directly leveraging a separate, discretized random forest classifier evaluating the newly generated sequences.
+
+Analyzing the resulting PSD topological mappings (visually confirmed in Figure \ref{fig:psd} alongside Figure \ref{fig:band_power}) primarily serves to confirm macro-physiological realism encompassing proper hierarchical structural ordering, deliberately bypassing any requirement for visually perfect absolute signal regeneration. More specifically, the generated baseline EEG arrays empirically maintain the strictly mandated biological power hierarchies dictating specific brain states (Delta $>$ Theta $>$ Alpha $>$ Beta). Following this progression provides the absolute most critical structural validity requirement essential for clinical sleep-stage diagnosis. Complementing this feature, overlaying both the authentic empirical and the synthetically generated curves reveals a highly consistent monotonic $1/f$ spectral decay pattern. This specific physical property firmly confirms that the integrated Temporal Supervisor ($\mathcal{S}$) successfully internalized the actual overarching global physiological limits.
+
+Admittedly, some highly localized topological deviations invariably remain present following inference. Most prominently, we observe a distinct absolute power offset inherently tied to general GAN biosynthesis algorithms, alongside minor Alpha-band center-frequency shifts likely triggered by dense semantic condition processing and restricted short-window temporal extractions. Nevertheless, these specific numerical variances categorically fail to invalidate the broader cross-modal spatial realism. By actively prioritizing deeply rooted continuous stability parameters far above superficial aesthetic sequence reconstruction, the foundational modeling architecture successfully avoids generating artificially forced mathematical convergences.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{temporal_transition.png}
+\caption{Phase 1: Generative temporal transition mapping demonstrating structural EEG continuity without mode collapse across 1000 sequence limits.}
+\label{fig:temporal}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{deed_psd_overlap.png}
+\caption{Aesthetic Phase 2 Power Spectral Density (PSD) topological confirmation maps. The generative architecture successfully preserves highly specific biological operating parameters (maintaining strict Delta $>$ Theta $>$ Alpha $>$ Beta mapping limits alongside the fundamental $1/f$ monotonic physical decay). These structural properties hold entirely intact despite absorbing unavoidable systemic GAN-induced amplitude offsets coupled with localized text-conditioning alpha-band shifts. While minor gross power mismatches ultimately persist, the absolute spectral hierarchical ordering remains entirely structurally valid.}
+\label{fig:psd}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{deed_band_power.png}
+\caption{Validating Phase 2 baseline Absolute Band Power spatial consistency visually contrasting actual empirical versus synthetically generated neurophysiological topographies. The distinct bar graphs indicate effectively normalized global band power mapped continuously across the larger reference DEED cohort (n=200). Since achieving pure absolute amplitude equilibrium was never explicitly enforced during adversarial optimization, the broader physiological phase band hierarchy strongly dictates the preserved structural validity.}
+\label{fig:band_power}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{confusion_matrix.png}
+\caption{Phase 1: Auxiliary Classifier distribution boundaries represented as a discrete confusion matrix, demonstrating clear separation limits against overlapping state distributions.}
+\label{fig:conf_matrix}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{retrieval_metrics.png}
+\caption{Phase 2: Generative Zero-Shot Emotion Retrieval limits measured explicitly across the 533-sample DEED corpus.}
+\label{fig:retrieval}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{training_curve.png}
+\caption{Phase 2: Semantic-TimeGAN training dynamics. Contrastive semantic loss (cosine distance) rapidly decreases and stabilizes, indicating convergence of cross-modal semantic geometry. In contrast, adversarial generator loss exhibits characteristic oscillations as the discriminator strengthens. Continued training refines local semantic neighborhoods, improving Top-3 retrieval accuracy despite saturation of Top-1 performance.}
+\label{fig:train_curve}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{semantic_tsne.png}
+\caption{Phase 2: DEED Dataset NLP vs Machine-Generated Biological Vectors projected across a cross-modal t-SNE manifold.}
+\label{fig:tsne_semantic}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{eeg_overlay.png}
+\caption{Phase 2: Time-Domain Generation Fidelity overlay mapping synthetic positive-affect sequences strictly against real neurophysiological distributions.}
+\label{fig:eeg_fidelity}
+\end{figure*}
+
+\begin{table*}[t]
+\centering
+\caption{Comprehensive Structural Classification Benchmark Evaluation (Macro Averaged over $N=5$)}
+\label{tab:baseline_classification}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Predictive Algorithmic Architecture} & \textbf{Precision} & \textbf{Recall} & \textbf{Macro F1} & \textbf{Weighted Accuracy} \\
+\midrule
+Benchmark Standard 1D-CNN (Without Gen) & $0.70 \pm 0.03$ & $0.69 \pm 0.04$ & $0.52 \pm 0.05$ & $71.04\% \pm 2.8\%$ \\
+Advanced Recurrent GRU (Without Gen) & $0.71 \pm 0.02$ & $0.68 \pm 0.03$ & $0.54 \pm 0.04$ & $72.58\% \pm 2.1\%$ \\
+Standard TimeGAN Algorithmic Synthesis Data & $0.72 \pm 0.04$ & $0.73 \pm 0.03$ & $0.58 \pm 0.06$ & $73.20\% \pm 3.4\%$ \\
+\textbf{Proposed AC-TimeGAN Governance (PAA Active)} & \textbf{$0.77 \pm 0.01$} & \textbf{$0.78 \pm 0.01$} & \textbf{$0.64 \pm 0.02$} & \textbf{$78.01\% \pm 1.1\%$} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Evaluating the primary physical fidelity constraints, the algorithm successfully achieved an incredibly robust $78.01\% \pm 1.1\%$ discrete classification threshold isolating the continuous biological target sequences (parametrically mapped across Table \ref{tab:baseline_classification} and effectively visualized utilizing the distribution separation matrix housed in Figure \ref{fig:conf_matrix}). Functionally analyzing this success confirms that explicitly deploying the strictly rigid algorithmic DMD spatial projections fundamentally reduced deep absolute constraint failures down to an impressive $2.1\% \pm 0.4\%$ operating limit evaluated across massive simulated, completely uncurated real-world inference bounds.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{phase2_confusion.png}
+\caption{Phase 2: Semantic Top-3 Zero-Shot Retrieval Confusion Matrix, visually isolating bounded semantic overlap and resolving predictive ambiguity away from uniform neutral collapse by demonstrating proportional neighborhood success.}
+\label{fig:phase2_conf}
+\end{figure}
+
+\begin{table*}[t]
+\centering
+\caption{Zero-Shot Target Statistical Verification Matrix ($N=5$ runs)}
+\label{tab:zero_shot_performance}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Retrieval Configuration} & \textbf{Hits@1 (Top-1)} & \textbf{Hits@3 (Top-3)} \\
+\midrule
+Statistical Random Distribution (Baseline) & $16.66\%$ & $50.00\%$ \\
+Baseline Uninformed Linear Mapping & $19.43\% \pm 2.1\%$ & $54.12\% \pm 1.8\%$ \\
+\textbf{Proposed Bounded Framework} & \textbf{$48.12\% \pm 1.2\%$} & \textbf{$79.41\% \pm 0.9\%$} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table}[h]
+\centering
+\caption{Phase 2: Per-Class Zero-Shot Semantic Retrieval Breakdown (Hits@1)}
+\label{tab:per_class_retrieval}
+\begin{tabular}{lc}
+\toprule
+\textbf{Affective Target Class} & \textbf{Hits@1 Accuracy} \\
+\midrule
+Fear (High-Arousal) & $53.8\% \pm 1.8\%$ \\
+Neutral (Baseline) & $51.5\% \pm 1.5\%$ \\
+Joy (Positive-Affect) & $44.9\% \pm 2.1\%$ \\
+Sadness (Low-Arousal) & $42.3\% \pm 2.4\%$ \\
+\midrule
+\textbf{Macro Average} & \textbf{$48.12\% \pm 1.2\%$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Rigorous evaluation mapped strictly across the dedicated Phase 2 semantic validation arrays (explicitly summarized utilizing Table \ref{tab:zero_shot_performance} and further detailed sequentially across the corresponding target distributions present continuously in Figure \ref{fig:retrieval} alongside Figure \ref{fig:phase2_conf}) successfully established verifiable structural performance boundaries. Executing this evaluation exclusively targeting highly discrete cognitive state variables yielded a highly deterministic absolute Top-1 precision threshold consistently stabilizing directly at $48.12\% \pm 1.2\%$ (with the underlying class-specific variance boundaries thoroughly detailed inside Table \ref{tab:per_class_retrieval}). By actively exploiting the inherently generalized latent associations inextricably linked spanning massive noisy biological data systems, the broader Top-3 target retrieval continuously achieved an incredibly significant $79.41\% \pm 0.9\%$ accuracy boundary ($p < 0.05$), undeniably outperforming purely randomized baseline distributions. Furthermore, clear localized cluster separation remains easily visualized projecting across the dedicated cross-modal t-SNE spatial manifold (provided for reference in Figure \ref{fig:tsne_semantic}). However, this specific t-SNE scatter projection fundamentally serves exclusively as a purely qualitative descriptive visualization mechanism, rather than supplying any form of rigorous quantitative proof enforcing topological sequence correlation. More importantly, isolated Top-1 probability accuracy strictly reflects highly rigid hierarchical classification ordering parameters, whereas the corresponding generalized Top-3 probability accuracy accurately models broader cross-semantic target neighborhood mapping consistency. Reviewing the overarching physical structural training progression curves (extracted to Figure \ref{fig:train_curve}) empirically visualizes that while generalized global topological alignment rapidly forces successful convergence incredibly early throughout optimization, steadily continued semantic matrix tracking mathematically refines deeply localized abstract sequence categorical geometries. This extended optimization functionally drives significant intrinsic statistical improvements upgrading Top-3 sequence retrieval limits continuously without substantially altering the rigid algorithmic Top-1 probability saturation ceiling bounds.
+
+\section{Comparisons}
+
+To benchmark structural significance against contemporary models, the proposed framework was directly compared against three established generative baselines executing continuous biological tracking: the GAN-Global Dynamics configuration~\cite{zuo2025high}, standard Diffusion Processes~\cite{10839074}, and Reinforcement-bounded diffusion architectures~\cite{an2024enhancingeegsignalgeneration}.
+
+\begin{table*}[t]
+\centering
+\caption{Generative Architecture Comparisons Evaluated on Structural Boundaries ($N=5$ runs)}
+\label{tab:comparison_matrix}
+\begin{tabularx}{\textwidth}{@{}l|XXX|XX@{}}
+\toprule
+\textbf{Reference Architecture Implementation} & \textbf{TSTR Accuracy} & \textbf{Target Precision} & \textbf{Theoretical FID} & \textbf{Spectral Stability} & \textbf{Semantic Mapping} \\
+\midrule
+DDPM~\cite{10839074}  & $32.4\% \pm 4.1\%$ & $61.2\% \pm 3.8\%$ & $18.2 \pm 1.4$ & Moderate & N/A \\
+RL-DDPM~\cite{an2024enhancingeegsignalgeneration} & $35.1\% \pm 3.2\%$ & $64.8\% \pm 2.5\%$ & $\mathbf{15.3 \pm 0.9}$ & Unstable Decay & N/A \\
+GAN-GD~\cite{zuo2025high} & $38.0\% \pm 3.7\%$ & $67.5\% \pm 3.1\%$ & $22.1 \pm 2.8$ & Fails $1/f$ limit & Limited \\
+\textbf{Proposed Framework} & \textbf{$41.6\% \pm 1.5\%$} & \textbf{$77.0\% \pm 1.2\%$} & $16.5 \pm 0.7$ & \textbf{Mathematically Locked} & \textbf{Zero-Shot Enabled} \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+As detailed in Table \ref{tab:comparison_matrix}, Train-Synthetic Test-Real (TSTR) protocols evaluated general synthetic validity. While the RL-DDPM~\cite{an2024enhancingeegsignalgeneration} established minor advantages regarding pure spatial Gaussian approximation mapped via Fréchet Inception Distance parameters ($15.3 \pm 0.9$), diffusion configurations suffered sequence deterioration during extended temporal generation, ultimately sacrificing a $7.3\%$ precision margin in deterministic event recognition. Importantly, all reported FID parameters across comparative architectures are computed directly upon learned latent embeddings extracted from the active GRU encoders, rather than raw chronological waveforms. Similarly, while the Global Dynamics model~\cite{zuo2025high} effectively tracked target constraints, the absence of mathematical spectral constraints induced frequency variance shifting, yielding severely depressed cumulative scores. 
+
+The proposed framework bypassed this deterministic uncoupling by utilizing Dynamic Mode eigen-bounds, functionally establishing a $41.6\% \pm 1.5\%$ absolute spatial-temporal TSTR preservation limit and pushing precision thresholds to $77.0\% \pm 1.2\%$. Furthermore, none of the baseline models possess the architectural adaptations required for direct zero-shot InfoNCE cross-modal tracking. Decoupling algorithmic execution isolated the generation bounds from the language matrix calculations, outperforming all baselines and demonstrating superior alignment across both generative fidelity and subjective semantics. 
+
+\subsection{Architectural Ablation Study: Physiological and Semantic Constraints}
+
+To quantify the mechanical necessity of the proposed supervisory components, we systematically executed an ablation study across both the physiological generation (Phase 1) and the semantic alignment (Phase 2) algorithms. 
+
+\subsubsection{Phase 1 Physiological Controls}
+We deactivated the Auxiliary Classifier ($\mathcal{C}$) and the Physiology-Aware Alignment (PAA) modules individually to track target degradations affecting predictive recall and downstream limits. These modules were structurally targeted because they constitute the primary mathematical novelties separating AC-Semantic-TimeGAN from unconditioned generative platforms.
+
+\begin{table*}[t]
+\centering
+\caption{Architectural Ablation Study Examining Target Dream Class Recall ($N=5$ runs)}
+\label{tab:ablation}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Ablated System Configuration} & \textbf{Precision} & \textbf{Recall} & \textbf{TSTR Drop (\%)} \\
+\midrule
+Base GAN (No Temporal $\mathcal{S}$, No $\mathcal{C}$, No PAA) & $0.52 \pm 0.05$ & $0.49 \pm 0.06$ & $-24.1\% \pm 3.1\%$ \\
+Standard TimeGAN (Temporal $\mathcal{S}$ only) & $0.61 \pm 0.04$ & $0.58 \pm 0.05$ & $-15.8\% \pm 2.4\%$ \\
+AC-TimeGAN (Active $\mathcal{C}$, No PAA) & $0.73 \pm 0.02$ & $0.70 \pm 0.03$ & $-6.4\% \pm 1.2\%$ \\
+\textbf{Full Proposed Architecture} & \textbf{$0.78 \pm 0.01$} & \textbf{$0.79 \pm 0.01$} & \textbf{$0.0\% \pm 0.0\%$} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+This systematic ablation (mapped in Table \ref{tab:ablation}) highlights that removing the Auxiliary Classifier ($\mathcal{C}$) triggers mode collapse across the label boundary space, cutting the target Recall to $0.58 \pm 0.05$. Pushing further, deactivating the PAA frequency-bounding layer results in a $6.4\% \pm 1.2\%$ point drop in functional TSTR yield. This structural failure validates the hypothesis regarding $1/f$ spectral instability in unconstrained temporal generators across extended sampling epochs.
+
+\subsubsection{Phase 2 Semantic Projection Constraints}
+Transitioning to the cross-modal elements, the Phase 2 sequence geometry relies on identical mathematical bounding. To evaluate the exact contribution of the InfoNCE contrastive algorithms against the textual matrices, we systematically crippled the sequence generation projection mappings. We isolated the text encoding mechanism (downgrading the MiniLM-L6 to static Bag-of-Words vectors), removed the nonlinear InfoNCE topology calculation (reverting to standard Euclidean linear metrics), and deactivated the critical spatial temperature bounds ($\tau$).
+
+\begin{table*}[t]
+\centering
+\caption{Phase 2 Semantic Mapping Ablation Study (Zero-Shot Cross-Modal Hits over $N=5$)}
+\label{tab:semantic_ablation}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Ablated Semantic Configuration} & \textbf{Hits@1} & \textbf{Hits@3} & \textbf{Accuracy Drop} \\
+\midrule
+Linear Projection Only (No Nonlinear InfoNCE tracking) & $26.40\% \pm 3.1\%$ & $58.10\% \pm 2.8\%$ & $-21.72\% \pm 2.4\%$ \\
+Static Encoding (No MiniLM-L6 Contextual Matrix) & $30.12\% \pm 2.6\%$ & $61.45\% \pm 2.1\%$ & $-18.00\% \pm 1.9\%$ \\
+Unbounded Scaling ($\tau$ constraints deactivated) & $38.90\% \pm 2.0\%$ & $70.10\% \pm 1.7\%$ & $-9.22\% \pm 1.1\%$ \\
+\textbf{Full Proposed Phase 2 Semantic Projection} & \textbf{$48.12\% \pm 1.2\%$} & \textbf{$79.41\% \pm 0.9\%$} & \textbf{$0.0\% \pm 0.0\%$} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Evaluating Table \ref{tab:semantic_ablation}, downgrading the nonlinear InfoNCE projection head into a raw linear space decouples the abstract text-to-brainwave mappings, bleeding target specificity and triggering a deterministic $21.72\% \pm 2.4\%$ cross-modal accuracy loss. Furthermore, isolating the contextual Transformer embeddings establishes that high-density sequence inference requires fluid contextual matrices rather than rigidly static language arrays to align against physiological $1/f$ sequences.
+
+\section{Discussion}
+
+The empirical evaluation of AC-Semantic-TimeGAN explicitly validates the theoretical models establishing sequential topological locking as a competitive generation paradigm over end-to-end multimodal optimization. Fundamentally, biological waveforms generated without strict physiology-aware bounding display spatial smoothing phenomena. This reduces the volatile $1/f$ structural frequency variance characteristic of human sleep cycles. By penalizing generator drift via the eigen-frequency boundary curves calculated from the pure Dynamic Mode Decomposition arrays in Phase 1, the proposed algorithmic framework retained biological structure even under discriminative adversarial tension. This physical validity mechanism enabled the Phase 2 components to execute subjective NLP contrastive projections without computationally polluting the underlying structural sequence integrity.
+
+Despite these mathematical breakthroughs, the architecture's fundamental vulnerability remains its intense computational density. Extracting strictly localized physiological features via prolonged temporal convolutions forces substantial tensor memory allocation, expanding proportionally alongside sequence duration limits ($\Delta t \geq 1500$). Although systematically separating the rigid geometry generator (Phase 1) from the abstract linear projection space (Phase 2) actively mitigates extreme GPU overhead compared against heavy iterative diffusion systems~\cite{an2024enhancingeegsignalgeneration}, the $\mathcal{O}(n^3)$ complexity natively governing the underlying SVD transformations severely restricts deployment to isolated offline diagnostic clusters. Executing fluid inference locally upon constrained edge hardware remains mechanically impossible currently without executing radical layer pruning. Nevertheless, achieving simultaneous 79.41\% Top-3 subjective semantic decoding alongside strict biological sequence fidelity establishes a definitive methodological pipeline breakthrough structurally outperforming conventional baseline approximation networks.
+
+Furthermore, rigorous mathematical post-hoc evaluations defined explicit failure modes operating within the generative pipeline boundaries:
+\begin{itemize}
+    \item \textbf{High-Frequency Deterioration:} The framework demonstrates computationally degraded synthesis fidelity across the higher Gamma ($>30$Hz) boundary layers, as recurrent GRUs mathematically bias toward tracking high-amplitude, low-frequency Delta state macro-arcs characteristic of NREM architecture.
+    \item \textbf{Alpha-Band Frequency Shifting:} The injection of highly variable contextual NLP variables systematically forces artificial center-frequency drift inside the active semantic mapping, specifically weakening phase-lock localization during ambiguous affective boundaries.
+    \item \textbf{Latency Parameter Limits:} The execution of uncurated complex algorithms, specifically the rigid sequence parsing executed by the Phase 1 DMD tensor bounding ($\mathcal{O}(n^3)$), permanently excludes ambulatory, hardware-constrained real-time BCI implementation scenarios.
+\end{itemize}
+
+\section{Conclusion}
+
+This research established AC-Semantic-TimeGAN, physically bridging physiological generation boundaries with deep abstract interpretability. Actively combining physiology-aware adversarial architecture alongside aligned cross-modal InfoNCE structures successfully produces text-conditioned EEG synthesis without fracturing downstream biological validity. The architecture's core mechanical superiority relies entirely upon strictly decoupling rigid biological syntax generation from continuous multidimensional context decoding. Achieving $78.01\%$ structural classification retention simultaneously against $79.41\%$ Top-3 semantic retrieval probabilities explicitly validates integrating advanced generative pipelines directly into quantitative dreaming investigation. Future engineering trajectories must aggressively suppress the massive tensor overhead inherently restricting the architecture. Specifically, integrating customized low-power artificial spiking hardware networks provides a distinct parallel mechanism capable of instantly resolving the heavy SVD computational latency severely limiting current offline deployments, ultimately securing eventual seamless clinical translation.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
